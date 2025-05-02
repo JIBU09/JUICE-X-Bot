@@ -1,0 +1,7 @@
+discord.py
+python-dotenv
+yt-dlp
+beautifulsoup4
+aiohttp
+lyricsgenius
+requests
