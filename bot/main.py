@@ -15,6 +15,12 @@ import aiohttp
 import lyricsgenius
 import requests
 import pytz
+# from PIL import Image
+# from io import BytesIO
+# import torch
+# from realesrgan import RealESRGANer
+# import numpy as np
+# from basicsr.archs.rrdbnet_arch import RRDBNet
 
 load_dotenv()
 TOKEN: Final[str] = os.getenv('DISCORD_TOKEN')
@@ -29,6 +35,7 @@ FFMPEG_OPTIONS = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
     'options': '-vn',
 }
+PIC_model_path = "RealESRGAN_x4plus.pth"
 
 
 intents: Intents = Intents.default()
@@ -469,6 +476,28 @@ async def show_queue(interaction: discord.Interaction):
         queue_list = "\n".join([f"{index + 1}. {url}" for index, url in enumerate(music_player.queue)])
         await interaction.response.send_message(f"**Current Queue:**\n{queue_list}", ephemeral=True)
 
+        
+
+@bot.tree.command(name="message", description="Show a message a user previously sent")
+async def play(interaction: discord.Interaction, channel_id: str, message_id: str):
+    channel = bot.get_channel(int(channel_id))
+    if channel is None:
+        await interaction.response.send_message("Channel not found.", ephemeral=True)
+        return
+
+    try:
+        message = await channel.fetch_message(int(message_id))
+        embed = discord.Embed(
+            title=f"Message from {message.author.display_name}",
+            description=message.content,
+            timestamp=message.created_at,
+            color=discord.Color.blue()
+        )
+        embed.set_footer(text=f"Message ID: {message.id}")
+        await interaction.response.send_message(embed=embed)
+    except discord.NotFound:
+        await interaction.response.send_message("Message not found.", ephemeral=True)
+
 
 @bot.event
 async def on_member_join(member):
@@ -842,6 +871,56 @@ async def get_song(interaction: discord.Interaction, song_name: str):
 
         print("Lyrics successfully sent!")
 
+    
+# @bot.tree.command(name="upscale", description="Upscale up to 10 images at 4× resolution.")
+# async def upscale(interaction: discord.Interaction, urls: str):
+#     """
+#     Takes space-separated URLs, up to 10.
+#     """
+#     url_list = urls.split()
+#     if len(url_list) > 10:
+#         await interaction.response.send_message("Please provide no more than 10 URLs.", ephemeral=True)
+#         return
+
+#     await interaction.response.defer()
+#     await interaction.followup.send(f"Upscaling {len(url_list)} image(s) at 4×…")
+
+#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#     model = RealESRGANer(device, scale=4)
+#     model.load_weights("RealESRGAN_x4plus.pth")
+
+#     for idx, url in enumerate(url_list, 1):
+#         try:
+#             file = await upscale_image(url, model)
+
+#             embed = discord.Embed(
+#                 title=f"Upscaled Image {idx}",
+#                 description=f"Here is your upscaled image ({url})",
+#                 color=discord.Color.dark_gray()
+#             )
+#             await interaction.followup.send(embed=embed, file=file)
+
+#             await asyncio.sleep(1)  # be nice to Discord’s rate limits
+#         except Exception as e:
+#             await interaction.followup.send(f"Failed to upscale image {idx}: {e}")
+
+
+
+
+# async def upscale_image(url: str, model) -> discord.File:
+#     response = requests.get(url)
+#     response.raise_for_status()
+#     img = Image.open(BytesIO(response.content)).convert("RGB")
+
+#     sr_image = model.predict(img)
+
+#     buffer = BytesIO()
+#     sr_image.save(buffer, format="PNG")
+#     buffer.seek(0)
+#     return discord.File(fp=buffer, filename="upscaled.png")
+
+
+
 
 
 def getLyrics(song_name):
@@ -857,6 +936,7 @@ def getLyrics(song_name):
     except Exception as e:
         print(f"Fehler bei der Lyrics-Suche: {e}")
         return None
+
 
 # Run the bot
 async def main():
