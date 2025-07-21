@@ -499,6 +499,73 @@ async def play(interaction: discord.Interaction, channel_id: str, message_id: st
         await interaction.response.send_message("Message not found.", ephemeral=True)
 
 
+@bot.tree.command(name="play_audio", description="Play audio/video attachment from a message in voice.")
+async def play_audio(interaction: discord.Interaction, channel_id: str, message_id: str):
+    await interaction.response.defer()  # give bot time to process
+
+    # Get target text channel and message
+    try:
+        channel = bot.get_channel(int(channel_id)) or await bot.fetch_channel(int(channel_id))
+        message = await channel.fetch_message(int(message_id))
+    except Exception as e:
+        await interaction.followup.send(f"⚠️ Failed to fetch message: {e}")
+        return
+
+    if not message.attachments:
+        await interaction.followup.send("❌ No attachments found in that message.")
+        return
+
+    # Find a valid audio/video file
+    attachment = None
+    for att in message.attachments:
+        if att.filename.endswith((".mp3", ".wav", ".mp4", ".m4a", ".ogg")):
+            attachment = att
+            break
+
+    if not attachment:
+        await interaction.followup.send("❌ No supported audio/video file found in the message.")
+        return
+
+    # Check if user is in a voice channel
+    if not interaction.user.voice or not interaction.user.voice.channel:
+        await interaction.followup.send("❌ You must be in a voice channel.")
+        return
+
+    voice_channel = interaction.user.voice.channel
+
+    # Connect to voice if not already
+    vc = interaction.guild.voice_client
+    if not vc:
+        vc = await voice_channel.connect()
+    elif vc.channel != voice_channel:
+        await vc.move_to(voice_channel)
+
+    # Play the audio
+    try:
+        if vc.is_playing():
+            vc.stop()
+
+        # FFmpegOpusAudio auto streams from URL
+        source = await discord.FFmpegOpusAudio.from_probe(attachment.url)
+        vc.play(source)
+
+        # embed = discord.Embed(
+        #     colour=discord.Colour.dark_gray(),
+        #     title=f"{attachment.filename}",
+        #     description=f"{attachment.filename} was requested by {user.mention}",
+        # )
+        # embed.set_thumbnail(url=thumbnail)
+        # await interaction.followup.send(embed=embed)
+
+
+        await interaction.followup.send(f"🎶 Now playing: `{attachment.filename}`")
+
+    except Exception as e:
+        await interaction.followup.send(f"⚠️ Failed to play audio: {e}")
+
+
+
+
 @bot.event
 async def on_member_join(member):
     try:
@@ -616,9 +683,9 @@ async def guess_songs(interaction: discord.Interaction, artist: Optional[str] = 
                         description=f"Correct! 🎉 The song was: {song_name}",
                         color=discord.Color.green()
                     )
-                    if interaction.user.voice and music_player and music_player.is_playing:
-                        await music_player.add_to_queue(f"{song_name} - {artist}")
-                        correct_song_added = True
+                    # if interaction.user.voice and music_player and music_player.is_playing:
+                    #     await music_player.add_to_queue(f"{song_name} - {artist}")
+                    #     correct_song_added = True
                 else:
                     response = discord.Embed(
                         description=f"Incorrect! 😢 The song was: {song_name}",
@@ -706,9 +773,6 @@ async def song_pool(interaction: discord.Interaction, artist: Optional[str] = No
         color=discord.Color.blue())
     
     await interaction.response.send_message(embed=embed)
-
-
-
 
 
 @bot.tree.command(name="get_song", description="Find a song by JuiceWRLD or XXXTENTACION by providing a lyric snippet.")
